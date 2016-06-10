@@ -208,7 +208,8 @@ class BatchGenerator(object):
             reader_factory = SlowReader
 
         with self.open() as csvfile:
-            reader = reader_factory(csvfile, dialect=dialect, sep=sep, encoding=self.encoding)
+            reader = reader_factory(csvfile, dialect=dialect, sep=sep,
+                                    encoding=self.encoding)
             #
             fieldnames = reader.fieldnames
 
@@ -221,9 +222,11 @@ class BatchGenerator(object):
                 yield Batch(rows_read, fieldnames, chunk, self.rty_cnt)
                 rows_read += n_rows
             if not has_content:
-                raise ValueError("Input file '{}' is empty.".format(self.dataset))
+                raise ValueError("Input file '{}' is empty.".format(
+                    self.dataset))
 
-            self._ui.error('chunking {} rows took {}'.format(rows_read, time() - t0))
+            self._ui.error('chunking {} rows took {}'.format(
+                rows_read, time() - t0))
 
 
 def peek_row(dataset, delimiter, ui, fast_mode):
@@ -378,7 +381,8 @@ class WorkUnitGenerator(object):
                                     ' round-trip: {:.0f}msec').format(
                                         exec_time,
                                         r.elapsed.total_seconds() * 1000))
-                    process_successful_request(result, batch, self.ctx, self.pred_name)
+                    process_successful_request(result, batch, self.ctx,
+                                               self.pred_name)
                 except Exception as e:
                     self._ui.fatal('{} response error: {}'.format(batch.id, e))
             else:
@@ -657,14 +661,16 @@ class OldRunContext(RunContext):
         """We filter everything that has not been checkpointed yet. """
         self._ui.info('playing checkpoint log forward.')
         already_processed_batches = set(self.db['checkpoints'])
-        batch_gen = BatchGenerator(self.dataset, self.n_samples, self.n_retry, self.delimiter,
-                                   self._ui, self.fast_mode)
+        batch_gen = BatchGenerator(self.dataset, self.n_samples, self.n_retry,
+                                   self.delimiter, self._ui, self.fast_mode)
 
-        return ifilter(lambda b: b.id not in already_processed_batches, batch_gen)
+        return ifilter(lambda b: b.id not in already_processed_batches,
+                       batch_gen)
 
 
 def authorize(user, api_token, n_retry, endpoint, base_headers, batch, ui):
-    """Check if user is authorized for the given model and that schema is correct.
+    """Check if user is authorized for the given model and that schema is
+    correct.
 
     This function will make a sync request to the api endpoint with a single
     row just to make sure that the schema is correct and the user
