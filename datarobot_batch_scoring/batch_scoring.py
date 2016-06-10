@@ -15,7 +15,7 @@ import threading
 import hashlib
 from functools import partial
 from functools import reduce
-from itertools import chain, ifilter
+from itertools import chain
 from time import time
 from multiprocessing import Queue
 from multiprocessing import Process
@@ -31,9 +31,11 @@ from .utils import acquire_api_token, iter_chunks
 
 if six.PY2:  # pragma: no cover
     from contextlib2 import ExitStack
+    from itertools import ifilter
     import dumbdbm  # noqa
 elif six.PY3:  # pragma: no cover
     from contextlib import ExitStack
+    ifilter = filter
     # for successful py2exe dist package
     from dbm import dumb  # noqa
 
