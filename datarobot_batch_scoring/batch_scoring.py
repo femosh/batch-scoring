@@ -15,7 +15,7 @@ import threading
 import hashlib
 from functools import partial
 from functools import reduce
-from itertools import chain
+from itertools import chain, ifilter
 from time import time
 from multiprocessing import Queue
 from multiprocessing import Process
@@ -208,23 +208,22 @@ class BatchGenerator(object):
             reader_factory = SlowReader
 
         with self.open() as csvfile:
-            reader = reader_factory(csvfile, dialect=dialect,
-                                    sep=sep, encoding=self.encoding)
+            reader = reader_factory(csvfile, dialect=dialect, sep=sep, encoding=self.encoding)
+            #
             fieldnames = reader.fieldnames
 
-            batch_num = None
+            has_content = False
             t0 = time()
             rows_read = 0
-            for batch_num, chunk in enumerate(iter_chunks(reader,
-                                                          self.chunksize)):
+            for chunk in iter_chunks(reader, self.chunksize):
+                has_content = True
                 n_rows = len(chunk)
                 yield Batch(rows_read, fieldnames, chunk, self.rty_cnt)
                 rows_read += n_rows
-            if batch_num is None:
-                raise ValueError("Input file '{}' is empty.".format(
-                    self.dataset))
-            self._ui.error('chunking {} rows took {}'.format(rows_read,
-                                                             time() - t0))
+            if not has_content:
+                raise ValueError("Input file '{}' is empty.".format(self.dataset))
+
+            self._ui.error('chunking {} rows took {}'.format(rows_read, time() - t0))
 
 
 def peek_row(dataset, delimiter, ui, fast_mode):
@@ -379,9 +378,7 @@ class WorkUnitGenerator(object):
                                     ' round-trip: {:.0f}msec').format(
                                         exec_time,
                                         r.elapsed.total_seconds() * 1000))
-
-                    process_successful_request(result, batch,
-                                               self.ctx, self.pred_name)
+                    process_successful_request(result, batch, self.ctx, self.pred_name)
                 except Exception as e:
                     self._ui.fatal('{} response error: {}'.format(batch.id, e))
             else:
@@ -407,7 +404,7 @@ class WorkUnitGenerator(object):
         return self.queue.has_next()
 
     def __iter__(self):
-        for i, batch in enumerate(self.queue):
+        for batch in self.queue:
             if batch.id == -1:  # sentinel
                 raise StopIteration()
             # if we exhaused our retries we drop the batch
@@ -660,13 +657,10 @@ class OldRunContext(RunContext):
         """We filter everything that has not been checkpointed yet. """
         self._ui.info('playing checkpoint log forward.')
         already_processed_batches = set(self.db['checkpoints'])
-        return (b for b in BatchGenerator(self.dataset,
-                                          self.n_samples,
-                                          self.n_retry,
-                                          self.delimiter,
-                                          self._ui,
-                                          self.fast_mode)
-                if b.id not in already_processed_batches)
+        batch_gen = BatchGenerator(self.dataset, self.n_samples, self.n_retry, self.delimiter,
+                                   self._ui, self.fast_mode)
+
+        return ifilter(lambda b: b.id not in already_processed_batches, batch_gen)
 
 
 def authorize(user, api_token, n_retry, endpoint, base_headers, batch, ui):
@@ -770,11 +764,9 @@ def run_batch_predictions(base_url, base_headers, user, pwd,
         # make the queue twice as big as the
         queue = MultiprocessingGeneratorBackedQueue(concurrent * 2, ui)
         shovel = Shovel(ctx, queue, ui)
-
         ui.info('Shovel go...')
         t2 = time()
         shovel.go()
-
         ui.info('shoveling complete | total time elapsed {}s'
                 .format(time() - t2))
 
@@ -797,8 +789,7 @@ def run_batch_predictions(base_url, base_headers, user, pwd,
                 time() - t1))
             ui.close()
         else:
-            responses = network.perform_requests(
-                work_unit_gen)
+            responses = network.perform_requests(work_unit_gen)
             for r in responses:
                 i += 1
                 ui.info('{} responses sent | time elapsed {}s'
