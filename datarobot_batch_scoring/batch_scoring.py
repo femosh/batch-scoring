@@ -369,7 +369,8 @@ class WorkUnitGenerator(object):
 
             elif isinstance(r, FakeResponse):
                 self.queue.push(batch)
-                self._ui.debug('Skipping processing response because of FakeResponse')
+                self._ui.debug('Skipping processing response '
+                               'because of FakeResponse')
             else:
                 try:
                     self._ui.warning('batch {} failed with status: {}'
