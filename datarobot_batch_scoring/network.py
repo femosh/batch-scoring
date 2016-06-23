@@ -18,17 +18,27 @@ FakeResponse = collections.namedtuple('FakeResponse', 'status_code, text')
 
 class Network(object):
 
-    def __init__(self, concurrency, timeout):
+    def __init__(self, concurrency, timeout, ui=None):
         self._executor = ThreadPoolExecutor(concurrency)
         self._timeout = timeout
         self.session = requests.Session()
+        self._ui = ui or logger
 
     def _request(self, request):
         prepared = self.session.prepare_request(request)
         try:
             self.session.send(prepared, timeout=self._timeout)
+        except requests.exceptions.ReadTimeout:
+            self._ui.warning("""
+                The server did not send any data
+                in the allotted amount of time.
+                You might want to increase --timeout parameter
+                or
+                decrease --n_samples --n_concurrent parameters
+            """)
+
         except Exception as exc:
-            logger.warning('Exception {}: {}'.format(type(exc), exc))
+            self._ui.debug('Exception {}: {}'.format(type(exc), exc))
             try:
                 callback = request.kwargs['hooks']['response']
             except AttributeError:
