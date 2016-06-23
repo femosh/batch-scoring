@@ -1,7 +1,8 @@
 import collections
 import logging
-
+import textwrap
 import gc
+
 import requests
 
 try:
@@ -29,13 +30,12 @@ class Network(object):
         try:
             self.session.send(prepared, timeout=self._timeout)
         except requests.exceptions.ReadTimeout:
-            self._ui.warning("""
-                The server did not send any data
-                in the allotted amount of time.
-                You might want to increase --timeout parameter
-                or
-                decrease --n_samples --n_concurrent parameters
-            """)
+            self._ui.warning(textwrap.dedent("""The server did not send any data
+in the allotted amount of time.
+You might want to increase --timeout parameter
+or
+decrease --n_samples --n_concurrent parameters
+"""))
 
         except Exception as exc:
             self._ui.debug('Exception {}: {}'.format(type(exc), exc))
